@@ -13,7 +13,7 @@ st.set_page_config(
 )
 
 # =============================================================================
-# DATABASE FUNCTIONS - Fetch real data from Supabase
+# DATABASE FUNCTIONS
 # =============================================================================
 
 @st.cache_data(ttl=60)
@@ -34,7 +34,6 @@ def get_compliance_summary(org_id):
         '''
     ).eq('organization_id', org_id).execute()
     
-    # Also fetch frameworks for each item
     enhanced_data = []
     for item in response.data:
         framework_response = supabase.table('frameworks').select('*').eq(
@@ -75,10 +74,8 @@ def calculate_metrics(compliance_data):
     critical = len([d for d in compliance_data if d['status'] == 'critical'])
     not_started = len([d for d in compliance_data if d['status'] == 'not_started'])
     
-    # Calculate compliance score (percentage compliant)
     compliance_score = int((compliant / total) * 100) if total > 0 else 0
     
-    # Calculate risk score (0-100, lower is better)
     risk_score = 0
     if total > 0:
         risk_score = (
@@ -133,7 +130,6 @@ def get_frameworks_summary(compliance_data):
         else:
             frameworks[framework_id]['not_started'] += 1
     
-    # Calculate scores for each framework
     for fw_id, fw_data in frameworks.items():
         total = fw_data['total']
         compliant = fw_data['compliant']
@@ -154,176 +150,289 @@ def get_recent_audit_logs(org_id, limit=5):
 
 
 # =============================================================================
-# IMPROVED CUSTOM CSS
+# IMPROVED CUSTOM CSS - Better Contrast & Complementary Colors
 # =============================================================================
 
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
     
     * {
         font-family: 'Inter', sans-serif;
     }
     
+    /* Main background - Clean white */
     .main {
-        background-color: #F8F9FA;
+        background-color: #FFFFFF;
     }
     
+    /* Sidebar - Deep navy with gold accents */
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #1e293b 0%, #334155 100%);
+        background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%);
         padding: 2rem 1rem;
+        border-right: 3px solid #D97706;
     }
     
     [data-testid="stSidebar"] * {
-        color: #F1F5F9 !important;
+        color: #F8FAFC !important;
     }
     
-    [data-testid="stSidebar"] h1, 
+    [data-testid="stSidebar"] h1 {
+        color: #FBBF24 !important;
+        font-weight: 800 !important;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    
     [data-testid="stSidebar"] h2, 
     [data-testid="stSidebar"] h3 {
-        color: #FCD116 !important;
-        font-weight: 700;
+        color: #FDE68A !important;
+        font-weight: 700 !important;
     }
     
+    /* Metric cards - High contrast */
     [data-testid="stMetricValue"] {
-        font-size: 2.5rem;
-        font-weight: 700;
-        color: #1e293b;
+        font-size: 3rem;
+        font-weight: 800;
+        color: #0F172A;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
     
     [data-testid="stMetricLabel"] {
-        font-size: 0.875rem;
-        font-weight: 600;
-        color: #64748b;
+        font-size: 1rem;
+        font-weight: 700;
+        color: #475569;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.1em;
     }
     
-    .stButton>button {
-        background: linear-gradient(135deg, #CE1126 0%, #9A0D1C 100%);
-        color: white;
-        border-radius: 10px;
-        padding: 0.75rem 1.5rem;
-        border: none;
+    [data-testid="stMetricDelta"] {
+        font-size: 1rem;
         font-weight: 600;
-        font-size: 0.95rem;
-        box-shadow: 0 2px 8px rgba(206, 17, 38, 0.2);
+    }
+    
+    /* Buttons - Bold orange/amber scheme */
+    .stButton>button {
+        background: linear-gradient(135deg, #D97706 0%, #B45309 100%);
+        color: #FFFFFF;
+        border-radius: 12px;
+        padding: 1rem 2rem;
+        border: none;
+        font-weight: 700;
+        font-size: 1rem;
+        letter-spacing: 0.03em;
+        box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
         transition: all 0.3s ease;
+        text-transform: uppercase;
     }
     
     .stButton>button:hover {
-        background: linear-gradient(135deg, #9A0D1C 0%, #CE1126 100%);
-        box-shadow: 0 4px 12px rgba(206, 17, 38, 0.35);
-        transform: translateY(-2px);
+        background: linear-gradient(135deg, #B45309 0%, #92400E 100%);
+        box-shadow: 0 6px 20px rgba(217, 119, 6, 0.5);
+        transform: translateY(-3px);
     }
     
+    /* Headers - Strong hierarchy */
     h1 {
-        color: #1e293b !important;
-        font-weight: 800 !important;
-        font-size: 2.5rem !important;
+        color: #0F172A !important;
+        font-weight: 900 !important;
+        font-size: 3rem !important;
         margin-bottom: 0.5rem !important;
+        letter-spacing: -0.03em !important;
     }
     
     h2 {
-        color: #334155 !important;
-        font-weight: 700 !important;
-        font-size: 1.75rem !important;
-        margin-top: 2rem !important;
+        color: #1E293B !important;
+        font-weight: 800 !important;
+        font-size: 2rem !important;
+        margin-top: 2.5rem !important;
+        margin-bottom: 1.5rem !important;
+        border-bottom: 3px solid #D97706;
+        padding-bottom: 0.5rem;
     }
     
+    h3 {
+        color: #334155 !important;
+        font-weight: 700 !important;
+        font-size: 1.5rem !important;
+    }
+    
+    /* Progress bars - Amber/orange gradient */
     .stProgress > div > div > div {
-        background: linear-gradient(90deg, #CE1126 0%, #FCD116 100%);
+        background: linear-gradient(90deg, #D97706 0%, #FBBF24 100%);
         border-radius: 10px;
     }
     
     .stProgress > div > div {
         background-color: #E2E8F0;
         border-radius: 10px;
+        height: 12px;
     }
     
+    /* Expanders - Clean white cards with strong borders */
     .streamlit-expanderHeader {
-        background-color: white;
-        border-radius: 12px;
-        border: 1px solid #E2E8F0;
-        padding: 1rem 1.5rem;
-        font-weight: 600;
-        color: #1e293b;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        background-color: #FFFFFF;
+        border-radius: 16px;
+        border: 3px solid #CBD5E1;
+        padding: 1.5rem 2rem;
+        font-weight: 700;
+        color: #0F172A;
+        font-size: 1.125rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s ease;
     }
     
     .streamlit-expanderHeader:hover {
-        border-color: #CBD5E1;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+        border-color: #D97706;
+        box-shadow: 0 4px 16px rgba(217, 119, 6, 0.2);
+        transform: translateY(-2px);
     }
     
     .streamlit-expanderContent {
-        background-color: white;
-        border: 1px solid #E2E8F0;
+        background-color: #F8FAFC;
+        border: 3px solid #E2E8F0;
         border-top: none;
-        border-radius: 0 0 12px 12px;
-        padding: 1.5rem;
+        border-radius: 0 0 16px 16px;
+        padding: 2rem;
     }
     
+    /* Success - Strong green */
     .stSuccess {
-        background-color: #ECFDF5;
-        border-left: 4px solid #10B981;
-        padding: 1rem 1.5rem;
-        border-radius: 8px;
-        color: #065F46;
+        background-color: #D1FAE5;
+        border-left: 6px solid #059669;
+        padding: 1.25rem 1.75rem;
+        border-radius: 12px;
+        color: #064E3B;
+        font-weight: 600;
+        font-size: 1rem;
     }
     
+    /* Warning - Strong amber */
     .stWarning {
         background-color: #FEF3C7;
-        border-left: 4px solid #F59E0B;
-        padding: 1rem 1.5rem;
-        border-radius: 8px;
-        color: #92400E;
+        border-left: 6px solid #D97706;
+        padding: 1.25rem 1.75rem;
+        border-radius: 12px;
+        color: #78350F;
+        font-weight: 600;
+        font-size: 1rem;
     }
     
+    /* Error - Strong red */
     .stError {
         background-color: #FEE2E2;
-        border-left: 4px solid #EF4444;
-        padding: 1rem 1.5rem;
-        border-radius: 8px;
-        color: #991B1B;
+        border-left: 6px solid #DC2626;
+        padding: 1.25rem 1.75rem;
+        border-radius: 12px;
+        color: #7F1D1D;
+        font-weight: 600;
+        font-size: 1rem;
     }
     
+    /* Info - Strong blue */
     .stInfo {
         background-color: #DBEAFE;
-        border-left: 4px solid #3B82F6;
-        padding: 1rem 1.5rem;
-        border-radius: 8px;
-        color: #1E40AF;
+        border-left: 6px solid #2563EB;
+        padding: 1.25rem 1.75rem;
+        border-radius: 12px;
+        color: #1E3A8A;
+        font-weight: 600;
+        font-size: 1rem;
     }
     
+    /* Metric container cards */
     div[data-testid="column"] > div {
-        background-color: white;
-        padding: 1.5rem;
-        border-radius: 12px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-        border: 1px solid #E2E8F0;
+        background: linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%);
+        padding: 2rem;
+        border-radius: 16px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        border: 2px solid #E2E8F0;
         transition: all 0.3s ease;
     }
     
     div[data-testid="column"] > div:hover {
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        border-color: #CBD5E1;
+        box-shadow: 0 8px 24px rgba(217, 119, 6, 0.15);
+        border-color: #D97706;
+        transform: translateY(-4px);
     }
     
+    /* Text - Better contrast */
+    p, .stMarkdown {
+        color: #334155;
+        line-height: 1.8;
+        font-size: 1.0625rem;
+        font-weight: 500;
+    }
+    
+    .stCaption {
+        color: #64748B;
+        font-size: 0.9375rem;
+        font-weight: 500;
+    }
+    
+    /* Horizontal rules */
     hr {
-        margin: 2rem 0;
+        margin: 3rem 0;
         border: none;
-        height: 1px;
-        background: linear-gradient(90deg, transparent, #E2E8F0, transparent);
+        height: 3px;
+        background: linear-gradient(90deg, transparent, #D97706, transparent);
     }
     
+    /* Container spacing */
     .block-container {
-        padding: 2rem 3rem;
-        max-width: 1400px;
+        padding: 3rem 4rem;
+        max-width: 1600px;
     }
     
+    /* Hide Streamlit branding */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* Tab styling */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0.5rem;
+        background-color: #F1F5F9;
+        padding: 0.75rem;
+        border-radius: 16px;
+        border: 2px solid #CBD5E1;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 12px;
+        padding: 1rem 2rem;
+        font-weight: 700;
+        color: #475569;
+        background-color: transparent;
+        border: 2px solid transparent;
+        font-size: 1rem;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #D97706 0%, #B45309 100%);
+        color: white;
+        border-color: #92400E;
+        box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
+    }
+    
+    /* Data frames */
+    .stDataFrame {
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        border: 2px solid #E2E8F0;
+    }
+    
+    /* Links */
+    a {
+        color: #D97706;
+        font-weight: 600;
+        text-decoration: none;
+    }
+    
+    a:hover {
+        color: #B45309;
+        text-decoration: underline;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -331,11 +440,9 @@ st.markdown("""
 # SESSION STATE & DATA LOADING
 # =============================================================================
 
-# Initialize session state
 if 'organization_id' not in st.session_state:
     st.session_state.organization_id = '11111111-1111-1111-1111-111111111111'
 
-# Fetch organization details
 org_id = st.session_state.organization_id
 
 try:
@@ -345,15 +452,11 @@ try:
         st.session_state.organization_name = org_data['name']
     else:
         st.session_state.organization_name = "Demo Fintech Ltd"
-        st.warning("⚠️ Organization not found in database. Using default.")
+        st.warning("⚠️ Organization not found in database.")
     
-    # Fetch compliance data
     compliance_data = get_compliance_summary(org_id)
-    
-    # Calculate real metrics
     metrics = calculate_metrics(compliance_data)
     
-    # Store in session state
     st.session_state.compliance_score = metrics['compliance_score']
     st.session_state.total_items = metrics['total_items']
     st.session_state.compliant_items = metrics['compliant']
@@ -372,10 +475,8 @@ except Exception as e:
 
 with st.sidebar:
     st.markdown("# 🇬🇭 CompliGH")
-    st.markdown("##### *Ghana Fintech Compliance*")
     st.markdown("---")
     
-    # Organization info box
     st.markdown("### 📊 Organization")
     st.info(f"**{st.session_state.organization_name}**")
     
@@ -383,113 +484,76 @@ with st.sidebar:
     score = st.session_state.compliance_score
     
     if score >= 80:
-        st.success(f"## {score}%\n**Excellent**")
+        st.success(f"# {score}%\n### ✅ Excellent")
     elif score >= 60:
-        st.warning(f"## {score}%\n**Good**")
+        st.warning(f"# {score}%\n### ⚠️ Good")
     else:
-        st.error(f"## {score}%\n**Needs Attention**")
+        st.error(f"# {score}%\n### 🔴 Needs Work")
     
     st.markdown("---")
     
-    # Quick stats in sidebar
-    st.markdown("### 🎯 Quick Stats")
+    st.markdown("### 🎯 Overview")
     col1, col2 = st.columns(2)
     with col1:
         frameworks_count = len(get_frameworks_summary(compliance_data))
-        st.metric("Frameworks", frameworks_count)
+        st.metric("**Frameworks**", frameworks_count)
     with col2:
-        st.metric("Items", st.session_state.total_items)
+        st.metric("**Items**", st.session_state.total_items)
     
     st.markdown("---")
-    
-    # Version info
-    st.markdown("""
-        <div style='text-align: center; padding: 1rem 0; color: #94A3B8;'>
-            <small>Version 1.0.0</small><br>
-            <small>© 2026 CompliGH</small>
-        </div>
-    """, unsafe_allow_html=True)
+    st.caption("**Version** 1.0.0")
+    st.caption("© 2026 CompliGH")
 
 # =============================================================================
 # MAIN CONTENT
 # =============================================================================
 
 st.title("📊 Compliance Dashboard")
-st.markdown("##### Real-time monitoring for Ghanaian fintech regulations")
+st.markdown("### Real-time compliance monitoring for Ghanaian fintech regulations")
 st.markdown("")
 
-# Top metrics row with REAL DATA
+# Top metrics
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
     score = st.session_state.compliance_score
     delta = "↑ 5%" if score >= 85 else "↓ 3%"
-    
-    st.metric(
-        label="Compliance Score",
-        value=f"{score}%",
-        delta=delta,
-        delta_color="normal",
-        help="Overall compliance across all frameworks"
-    )
+    st.metric("Compliance Score", f"{score}%", delta, delta_color="normal")
 
 with col2:
     total = st.session_state.total_items
     needs_attention = st.session_state.warning_items + st.session_state.critical_items
-    
-    st.metric(
-        label="Active Regulations",
-        value=str(total),
-        delta=f"{needs_attention} need attention",
-        delta_color="inverse",
-        help="Total compliance items being tracked"
-    )
+    st.metric("Active Regulations", str(total), f"{needs_attention} need attention", delta_color="inverse")
 
 with col3:
     risk = st.session_state.risk_score
     
     if risk < 30:
         risk_level = "Low"
-        risk_color = "normal"
         risk_delta = "↓ 2 points"
     elif risk < 60:
         risk_level = "Medium"
-        risk_color = "off"
         risk_delta = "→ Stable"
     else:
         risk_level = "High"
-        risk_color = "inverse"
         risk_delta = "↑ Action needed"
     
-    st.metric(
-        label="Risk Level",
-        value=risk_level,
-        delta=risk_delta,
-        delta_color=risk_color,
-        help=f"Current risk score: {risk}/100"
-    )
+    st.metric("Risk Level", risk_level, risk_delta)
 
 with col4:
-    st.metric(
-        label="Next Audit",
-        value="14 days",
-        delta="Q1 BoG Report",
-        help="Upcoming regulatory deadline"
-    )
+    st.metric("Next Audit", "14 days", "Q1 BoG Report")
 
 st.markdown("---")
 
-# Main layout - two columns
+# Main layout
 col_main, col_side = st.columns([2, 1], gap="large")
 
 with col_main:
-    st.markdown("## 📋 Compliance Frameworks Overview")
+    st.markdown("## 📋 Compliance Frameworks")
     st.markdown("")
     
-    # Get frameworks summary from real data
     frameworks_summary = get_frameworks_summary(compliance_data)
     
-    # Map framework names to emojis
     framework_display = {
         'Bank of Ghana': {'emoji': '🏦', 'order': 1},
         'AML/CFT': {'emoji': '💰', 'order': 2},
@@ -499,52 +563,51 @@ with col_main:
         'PCI DSS': {'emoji': '💳', 'order': 6}
     }
     
-    # Sort frameworks by display order
     sorted_frameworks = sorted(
         frameworks_summary.items(),
         key=lambda x: framework_display.get(x[1]['name'], {}).get('order', 99)
     )
     
-    # Display each framework
     for fw_id, stats in sorted_frameworks:
         framework_name = stats['name']
         emoji = framework_display.get(framework_name, {}).get('emoji', '📋')
         
         score = stats['score']
         if score >= 80:
-            badge = "🟢 Compliant"
+            badge = "✅ Compliant"
+            badge_color = "#059669"
         elif score >= 60:
-            badge = "🟡 Review Needed"
+            badge = "⚠️ Review"
+            badge_color = "#D97706"
         else:
-            badge = "🔴 Action Required"
+            badge = "🔴 Critical"
+            badge_color = "#DC2626"
         
-        with st.expander(f"{emoji} {framework_name} — **{score}%** — {badge}", expanded=False):
+        with st.expander(f"{emoji} **{framework_name}** — {score}% — {badge}", expanded=False):
             fcol1, fcol2, fcol3, fcol4 = st.columns(4)
             fcol1.metric("📊 Total", stats['total'])
             fcol2.metric("✅ Compliant", stats['compliant'])
             fcol3.metric("⚠️ Warning", stats['warning'])
-            fcol4.metric("❌ Critical", stats['critical'])
+            fcol4.metric("🔴 Critical", stats['critical'])
             
             st.markdown("")
-            
             st.progress(score / 100)
-            st.markdown(f"<div style='text-align: right; color: #64748b; font-size: 0.875rem; margin-top: 0.25rem;'>{score}% Complete</div>", unsafe_allow_html=True)
-            
+            st.markdown(f"**{score}% Complete**")
             st.markdown("")
             
-            acol1, acol2, acol3 = st.columns([1, 1, 1])
+            acol1, acol2, acol3 = st.columns(3)
             with acol1:
                 if st.button(f"📝 View Details", key=f"view_{fw_id}", use_container_width=True):
                     st.switch_page("pages/1_📋_Compliance_Frameworks.py")
             with acol2:
-                if st.button(f"🔄 Update Status", key=f"update_{fw_id}", use_container_width=True):
+                if st.button(f"🔄 Update", key=f"update_{fw_id}", use_container_width=True):
                     st.switch_page("pages/1_📋_Compliance_Frameworks.py")
             with acol3:
-                if st.button(f"📎 Documents", key=f"docs_{fw_id}", use_container_width=True):
-                    st.info("📁 Document management coming soon!")
+                if st.button(f"📎 Files", key=f"docs_{fw_id}", use_container_width=True):
+                    st.info("📁 Coming soon!")
 
 with col_side:
-    st.markdown("## ⚠️ Risk Assessment")
+    st.markdown("## ⚠️ Risk Score")
     st.markdown("")
     
     risk_score = st.session_state.risk_score
@@ -553,21 +616,22 @@ with col_side:
         mode="gauge+number",
         value=risk_score,
         domain={'x': [0, 1], 'y': [0, 1]},
-        title={'text': "<b>Risk Score</b>", 'font': {'size': 18, 'color': '#1e293b'}},
-        number={'font': {'size': 48, 'color': '#1e293b'}},
+        title={'text': "<b>Current Risk</b>", 'font': {'size': 20, 'color': '#0F172A'}},
+        number={'font': {'size': 56, 'color': '#0F172A', 'family': 'Inter'}},
         gauge={
-            'axis': {'range': [None, 100], 'tickwidth': 2, 'tickcolor': "#CBD5E1"},
-            'bar': {'color': "#CE1126", 'thickness': 0.75},
+            'axis': {'range': [None, 100], 'tickwidth': 3, 'tickcolor': "#94A3B8"},
+            'bar': {'color': "#D97706", 'thickness': 0.8},
             'bgcolor': "white",
-            'borderwidth': 0,
+            'borderwidth': 3,
+            'bordercolor': "#CBD5E1",
             'steps': [
                 {'range': [0, 30], 'color': '#D1FAE5'},
                 {'range': [30, 60], 'color': '#FEF3C7'},
                 {'range': [60, 100], 'color': '#FEE2E2'}
             ],
             'threshold': {
-                'line': {'color': "#1e293b", 'width': 4},
-                'thickness': 0.8,
+                'line': {'color': "#0F172A", 'width': 5},
+                'thickness': 0.9,
                 'value': risk_score
             }
         }
@@ -575,121 +639,104 @@ with col_side:
     
     fig.update_layout(
         paper_bgcolor="rgba(255,255,255,0)",
-        plot_bgcolor="rgba(255,255,255,0)",
-        font={'color': "#1e293b", 'family': "Inter"},
-        height=280,
-        margin=dict(l=20, r=20, t=50, b=20)
+        font={'color': "#0F172A", 'family': "Inter"},
+        height=300,
+        margin=dict(l=30, r=30, t=60, b=30)
     )
     
     st.plotly_chart(fig, use_container_width=True)
     
     if risk_score < 30:
-        st.success("✅ **Low Risk** — System is secure")
+        st.success("### ✅ Low Risk\nSystem is secure")
     elif risk_score < 60:
-        st.warning("⚠️ **Medium Risk** — Review needed")
+        st.warning("### ⚠️ Medium Risk\nReview recommended")
     else:
-        st.error("🚨 **High Risk** — Immediate action required")
+        st.error("### 🔴 High Risk\nImmediate action needed")
     
     st.markdown("---")
     
-    st.markdown("## 📅 Upcoming Deadlines")
+    st.markdown("## 📅 Deadlines")
     st.markdown("")
     
     deadlines = [
-        {"task": "Quarterly BoG Report", "days": 14, "status": "urgent", "icon": "⏰"},
-        {"task": "AML Risk Assessment", "days": 28, "status": "normal", "icon": "📋"},
-        {"task": "DPC Annual Filing", "days": 45, "status": "normal", "icon": "📄"},
-        {"task": "ISO 27001 Audit", "days": 60, "status": "normal", "icon": "🔐"}
+        {"task": "Quarterly BoG Report", "days": 14, "urgent": True},
+        {"task": "AML Risk Assessment", "days": 28, "urgent": False},
+        {"task": "DPC Annual Filing", "days": 45, "urgent": False},
+        {"task": "ISO 27001 Audit", "days": 60, "urgent": False}
     ]
     
     for deadline in deadlines:
-        if deadline['status'] == 'urgent':
-            st.warning(f"**{deadline['icon']} {deadline['task']}**\n\n⏱️ Due in **{deadline['days']} days**")
+        if deadline['urgent']:
+            st.warning(f"**⏰ {deadline['task']}**\n\n{deadline['days']} days remaining")
         else:
-            st.info(f"**{deadline['icon']} {deadline['task']}**\n\n📆 Due in {deadline['days']} days")
-        st.markdown("")
+            st.info(f"**📋 {deadline['task']}**\n\n{deadline['days']} days")
 
 st.markdown("---")
 
-# Recent activity with REAL DATA
 st.markdown("## 📜 Recent Activity")
-st.markdown("##### Latest compliance actions across your organization")
 st.markdown("")
 
 try:
     recent_logs = get_recent_audit_logs(org_id, limit=5)
     
     if recent_logs:
-        for i, log in enumerate(recent_logs):
-            col1, col2, col3 = st.columns([2, 5, 2])
+        for log in recent_logs:
+            col1, col2 = st.columns([1, 5])
             
-            # Format timestamp
             created_at = datetime.fromisoformat(log['created_at'].replace('Z', '+00:00'))
             time_ago = datetime.now() - created_at.replace(tzinfo=None)
             
             if time_ago.days > 0:
-                time_str = f"{time_ago.days} day{'s' if time_ago.days > 1 else ''} ago"
+                time_str = f"{time_ago.days}d ago"
             elif time_ago.seconds >= 3600:
                 hours = time_ago.seconds // 3600
-                time_str = f"{hours} hour{'s' if hours > 1 else ''} ago"
+                time_str = f"{hours}h ago"
             else:
-                minutes = time_ago.seconds // 60
-                time_str = f"{minutes} minute{'s' if minutes > 1 else ''} ago"
+                minutes = max(1, time_ago.seconds // 60)
+                time_str = f"{minutes}m ago"
             
             with col1:
-                st.markdown(f"<div style='color: #94A3B8; font-size: 0.875rem;'>{time_str}</div>", unsafe_allow_html=True)
+                st.markdown(f"**{time_str}**")
             
             with col2:
-                icon_map = {"update": "🔄", "upload": "📤", "complete": "✅", "generate": "📊", "create": "➕", "delete": "🗑️"}
+                icon_map = {"update": "🔄", "upload": "📤", "complete": "✅", "generate": "📊"}
                 icon = icon_map.get(log['action'], "📝")
-                st.markdown(f"<div style='color: #334155; font-weight: 500;'>{icon} {log['description']}</div>", unsafe_allow_html=True)
+                st.markdown(f"{icon} {log['description']}")
             
-            with col3:
-                st.markdown(f"<div style='color: #64748b; font-size: 0.875rem; text-align: right;'>System</div>", unsafe_allow_html=True)
-            
-            if i < len(recent_logs) - 1:
-                st.markdown("<div style='border-bottom: 1px solid #E2E8F0; margin: 0.75rem 0;'></div>", unsafe_allow_html=True)
+            st.markdown("")
     else:
-        st.info("No recent activity to display")
+        st.info("No recent activity")
         
 except Exception as e:
-    st.warning("Unable to load recent activity")
+    st.warning("Unable to load activity")
 
 st.markdown("---")
 
-# Call to action buttons
 st.markdown("## 🚀 Quick Actions")
 st.markdown("")
 
-col1, col2, col3 = st.columns(3, gap="medium")
+col1, col2, col3 = st.columns(3)
 
 with col1:
-    if st.button("📥 Generate Report", use_container_width=True, type="primary"):
-        with st.spinner("Generating comprehensive compliance report..."):
-            import time
-            time.sleep(1)
-        st.success("✅ Report generated successfully!")
+    if st.button("📥 GENERATE REPORT", use_container_width=True):
+        st.success("✅ Report generated!")
         
 with col2:
-    if st.button("📧 Send Alerts", use_container_width=True, type="primary"):
-        with st.spinner("Sending deadline reminders to team..."):
-            import time
-            time.sleep(1)
-        st.success(f"✅ Alerts sent to team members!")
+    if st.button("📧 SEND ALERTS", use_container_width=True):
+        st.success("✅ Alerts sent!")
 
 with col3:
-    if st.button("⚙️ Settings", use_container_width=True, type="primary"):
+    if st.button("⚙️ SETTINGS", use_container_width=True):
         st.switch_page("pages/4_⚙️_Settings.py")
 
-# Footer
 st.markdown("---")
 st.markdown("""
-    <div style='text-align: center; padding: 2rem 0 1rem 0; color: #94A3B8;'>
-        <p style='margin: 0; font-size: 0.875rem;'>
-            <strong style='color: #64748b;'>CompliGH</strong> — Ghana Fintech Compliance Monitor
+    <div style='text-align: center; padding: 2rem 0; color: #64748B;'>
+        <p style='margin: 0; font-size: 1.125rem; font-weight: 700; color: #334155;'>
+            CompliGH — Ghana Fintech Compliance Monitor
         </p>
-        <p style='margin: 0.5rem 0 0 0; font-size: 0.75rem;'>
-            Powered by Streamlit • Built with ❤️ for Ghana's fintech ecosystem
+        <p style='margin: 0.5rem 0 0 0; font-size: 0.875rem; font-weight: 500;'>
+            Built with ❤️ for Ghana's fintech ecosystem
         </p>
     </div>
 """, unsafe_allow_html=True)
