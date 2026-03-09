@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
+from utils.database import get_supabase_client
 
 # Page configuration
 st.set_page_config(
