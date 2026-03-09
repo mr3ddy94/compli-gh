@@ -26,6 +26,17 @@ def get_supabase_client() -> Client:
         return client
     except KeyError:
         st.error("⚠️ Supabase credentials not found in secrets. Please configure in Streamlit Cloud settings.")
+        st.info("""
+        **To add secrets:**
+        1. Go to Streamlit Cloud dashboard
+        2. Click your app → Settings → Secrets
+        3. Add:
+        ```
+        [supabase]
+        url = "your-supabase-url"
+        key = "your-anon-key"
+        ```
+        """)
         st.stop()
     except Exception as e:
         st.error(f"❌ Error connecting to database: {e}")
@@ -46,3 +57,21 @@ def test_connection():
     except Exception as e:
         st.error(f"Database connection failed: {e}")
         return False
+
+
+def get_table_count(table_name: str) -> int:
+    """
+    Get row count for a table
+    
+    Args:
+        table_name: Name of the table
+        
+    Returns:
+        int: Number of rows in table
+    """
+    try:
+        supabase = get_supabase_client()
+        response = supabase.table(table_name).select('id', count='exact').execute()
+        return response.count
+    except:
+        return 0
