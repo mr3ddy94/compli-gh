@@ -2,11 +2,42 @@ import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
 from datetime import datetime, timedelta
+from utils.database import get_supabase_client
 
 st.set_page_config(page_title="Risk Assessment", page_icon="⚠️", layout="wide")
 
 st.title("⚠️ Risk Assessment")
 st.markdown("Comprehensive risk analysis across all compliance frameworks")
+
+# Get organization ID
+org_id = st.session_state.get('organization_id', '11111111-1111-1111-1111-111111111111')
+
+# Fetch compliance data
+@st.cache_data(ttl=60)
+def get_risk_data(org_id):
+    """Fetch and calculate risk data"""
+    supabase = get_supabase_client()
+    
+    response = supabase.table('compliance_status').select(
+        '*, compliance_items(name, criticality, framework_id)'
+    ).eq('organization_id', org_id).execute()
+    
+    return response.data
+
+try:
+    compliance_data = get_risk_data(org_id)
+    
+    # Calculate risk metrics
+    total = len(compliance_data)
+    critical_items = len([d for d in compliance_data if d['status'] == 'critical'])
+    warning_items = len([d for d in compliance_data if d['status'] == 'warning'])
+    
+    # Calculate overall risk score
+    risk_score = min((critical_items * 10) + (warning_items * 3), 100)
+    
+except Exception as e:
+    st.error(f"Error loading risk data: {e}")
+    st.stop()
 
 col1, col2 = st.columns([1, 1])
 
@@ -15,9 +46,9 @@ with col1:
     
     risk_factors = pd.DataFrame({
         'Category': ['Regulatory Changes', 'Operational Risk', 'Compliance Gaps', 'Market Risk', 'Cybersecurity'],
-        'Level': ['Low', 'Medium', 'Low', 'Low', 'Medium'],
-        'Score': [15, 35, 20, 10, 28],
-        'Impact': ['Minor', 'Moderate', 'Minor', 'Minor', 'Moderate']
+        'Level': ['Low', 'Medium' if warning_items > 3 else 'Low', 'Medium' if critical_items > 0 else 'Low', 'Low', 'Medium' if critical_items > 1 else 'Low'],
+        'Score': [15, min(35, warning_items * 5), min(40, critical_items * 10), 10, min(30, critical_items * 8)],
+        'Impact': ['Minor', 'Moderate', 'Moderate' if critical_items > 0 else 'Minor', 'Minor', 'Moderate']
     })
     
     st.dataframe(risk_factors, use_container_width=True, hide_index=True)
@@ -25,25 +56,38 @@ with col1:
     st.markdown("---")
     st.markdown("### 🎯 Priority Mitigation Actions")
     
-    st.error("🔴 **HIGH PRIORITY**")
-    st.markdown("- Complete ISO 27001 security awareness training (23 employees)")
-    st.markdown("- Complete AML/CFT staff training (18 employees)")
+    # Show critical items first
+    critical_shown = 0
+    warning_shown = 0
     
-    st.warning("🟡 **MEDIUM PRIORITY**")
-    st.markdown("- Schedule quarterly access rights review (85 accounts)")
-    st.markdown("- Complete PCI DSS vulnerability scan (due in 8 days)")
-    st.markdown("- Resolve payment disputes beyond SLA (8 cases)")
+    if critical_items > 0:
+        st.error("🔴 **HIGH PRIORITY**")
+        for item in compliance_data:
+            if item['status'] == 'critical' and critical_shown < 3:
+                st.markdown(f"- {item['compliance_items']['name']}")
+                critical_shown += 1
     
-    st.info("🟢 **LOW PRIORITY**")
-    st.markdown("- Update data breach response plan")
-    st.markdown("- Review PCI DSS security policies (15 policies)")
+    if warning_items > 0:
+        st.warning("🟡 **MEDIUM PRIORITY**")
+        for item in compliance_data:
+            if item['status'] == 'warning' and warning_shown < 3:
+                st.markdown(f"- {item['compliance_items']['name']}")
+                warning_shown += 1
+    
+    if critical_items == 0 and warning_items == 0:
+        st.success("🟢 **All systems operational**")
+        st.markdown("- Continue monitoring compliance status")
+        st.markdown("- Maintain current security posture")
 
 with col2:
     st.subheader("📈 Risk Trend Analysis")
     
-    # Generate 6 months of risk data
+    # Generate 6 months of trend data (simulated improvement)
     dates = pd.date_range(end=datetime.now(), periods=6, freq='M')
-    scores = [45, 42, 38, 35, 33, 32]
+    # Simulate decreasing risk over time
+    base_score = risk_score + 15
+    scores = [base_score - (i * 2) for i in range(6)]
+    scores[-1] = risk_score  # Current score
     
     fig = go.Figure()
     fig.add_trace(go.Scatter(
@@ -74,37 +118,85 @@ with col2:
     st.markdown("### 📉 Risk Improvement")
     
     mcol1, mcol2, mcol3 = st.columns(3)
-    mcol1.metric("Current Score", "32", "-13 pts (6mo)")
-    mcol2.metric("Target Score", "30", "2 pts to go")
-    mcol3.metric("Improvement", "29%", "↓ Since start")
+    improvement = base_score - risk_score
+    mcol1.metric("Current Score", risk_score, f"-{improvement} pts (6mo)")
+    mcol2.metric("Target Score", "30", f"{max(0, risk_score - 30)} pts to go")
+    mcol3.metric("Improvement", f"{int((improvement/base_score)*100)}%", "↓ Since start")
 
 st.markdown("---")
 
-# Risk matrix
+# Risk matrix by framework
 st.subheader("🎯 Risk Matrix by Framework")
 
-frameworks_risk = pd.DataFrame({
-    'Framework': ['Bank of Ghana', 'AML/CFT', 'Data Protection', 'Payment Systems', 'ISO 27001', 'PCI DSS'],
-    'Likelihood': ['Low', 'Medium', 'Low', 'Low', 'Medium', 'Low'],
-    'Impact': ['High', 'High', 'Medium', 'Medium', 'High', 'Medium'],
-    'Overall Risk': ['Medium', 'High', 'Low', 'Low', 'High', 'Medium'],
-    'Mitigation Status': ['In Progress', 'Action Needed', 'On Track', 'On Track', 'Action Needed', 'In Progress']
-})
+# Group by framework
+framework_risks = {}
+for item in compliance_data:
+    fw_id = item['compliance_items']['framework_id']
+    
+    # Fetch framework name (cached)
+    @st.cache_data(ttl=300)
+    def get_framework_name(fw_id):
+        supabase = get_supabase_client()
+        response = supabase.table('frameworks').select('name').eq('id', fw_id).execute()
+        return response.data[0]['name'] if response.data else 'Unknown'
+    
+    fw_name = get_framework_name(fw_id)
+    
+    if fw_name not in framework_risks:
+        framework_risks[fw_name] = {'critical': 0, 'warning': 0, 'compliant': 0}
+    
+    framework_risks[fw_name][item['status']] = framework_risks[fw_name].get(item['status'], 0) + 1
 
-# Color code based on risk level
+# Build dataframe
+fw_data = []
+for fw_name, counts in framework_risks.items():
+    critical = counts.get('critical', 0)
+    warning = counts.get('warning', 0)
+    
+    # Determine overall risk
+    if critical > 0:
+        overall_risk = 'High'
+        likelihood = 'High'
+        mitigation_status = 'Action Needed'
+    elif warning > 2:
+        overall_risk = 'Medium'
+        likelihood = 'Medium'
+        mitigation_status = 'In Progress'
+    else:
+        overall_risk = 'Low'
+        likelihood = 'Low'
+        mitigation_status = 'On Track'
+    
+    fw_data.append({
+        'Framework': fw_name,
+        'Critical Items': critical,
+        'Warning Items': warning,
+        'Likelihood': likelihood,
+        'Impact': 'High' if critical > 0 else 'Medium',
+        'Overall Risk': overall_risk,
+        'Mitigation Status': mitigation_status
+    })
+
+frameworks_risk_df = pd.DataFrame(fw_data)
+
+# Display with color coding
 def color_risk(val):
     if val == 'High':
-        return 'background-color: #DC2626; color: white'
+        return 'background-color: #FEE2E2; color: #991B1B; font-weight: 600;'
     elif val == 'Medium':
-        return 'background-color: #F59E0B; color: white'
-    else:
-        return 'background-color: #10B981; color: white'
+        return 'background-color: #FEF3C7; color: #92400E; font-weight: 600;'
+    elif val == 'Low':
+        return 'background-color: #D1FAE5; color: #065F46; font-weight: 600;'
+    return ''
 
-st.dataframe(
-    frameworks_risk.style.applymap(color_risk, subset=['Overall Risk']),
-    use_container_width=True,
-    hide_index=True
-)
+if not frameworks_risk_df.empty:
+    styled_df = frameworks_risk_df.style.applymap(
+        color_risk, 
+        subset=['Overall Risk', 'Likelihood']
+    )
+    st.dataframe(styled_df, use_container_width=True, hide_index=True)
+else:
+    st.info("No risk data available")
 
 st.markdown("---")
 
