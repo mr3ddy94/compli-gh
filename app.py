@@ -116,14 +116,12 @@ def send_email_alerts(org_id, alert_type="deadline"):
     """Send email alerts to team"""
     supabase = get_supabase_client()
     
-    # Get compliance officers
     users_response = supabase.table('users').select('email, full_name').eq(
         'organization_id', org_id
     ).in_('role', ['admin', 'officer']).execute()
     
     recipients = [u['email'] for u in users_response.data] if users_response.data else []
     
-    # Log the alert
     supabase.table('audit_logs').insert({
         'organization_id': org_id,
         'action': 'send_alert',
@@ -136,56 +134,45 @@ def send_email_alerts(org_id, alert_type="deadline"):
 
 def generate_pdf_report(org_id, org_name, compliance_data, metrics, frameworks_summary):
     """Generate PDF compliance report"""
-    from reportlab.lib.pagesizes import letter, A4
+    from reportlab.lib.pagesizes import letter
     from reportlab.lib import colors
     from reportlab.lib.units import inch
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
     
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
     story = []
     styles = getSampleStyleSheet()
     
-    # Custom styles
     title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Title'],
-        fontSize=28,
-        textColor=colors.HexColor('#D97706'),
-        spaceAfter=12,
-        alignment=TA_CENTER,
-        fontName='Helvetica-Bold'
+        'CustomTitle', parent=styles['Title'], fontSize=28,
+        textColor=colors.HexColor('#D97706'), spaceAfter=12,
+        alignment=TA_CENTER, fontName='Helvetica-Bold'
     )
     
     heading_style = ParagraphStyle(
-        'CustomHeading',
-        parent=styles['Heading1'],
-        fontSize=16,
-        textColor=colors.HexColor('#0F172A'),
-        spaceAfter=12,
-        spaceBefore=12,
-        fontName='Helvetica-Bold'
+        'CustomHeading', parent=styles['Heading1'], fontSize=16,
+        textColor=colors.HexColor('#0F172A'), spaceAfter=12,
+        spaceBefore=12, fontName='Helvetica-Bold'
     )
     
-    # Title
     story.append(Paragraph("CompliGH Compliance Report", title_style))
     story.append(Paragraph(org_name, styles['Normal']))
     story.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}", styles['Normal']))
     story.append(Spacer(1, 0.3*inch))
     
-    # Executive Summary
     story.append(Paragraph("Executive Summary", heading_style))
     
     summary_data = [
         ['Metric', 'Value', 'Status'],
         ['Compliance Score', f"{metrics['compliance_score']}%", 
          'Excellent' if metrics['compliance_score'] >= 80 else 'Good' if metrics['compliance_score'] >= 60 else 'Needs Attention'],
-        ['Total Compliance Items', str(metrics['total_items']), '-'],
-        ['Compliant Items', str(metrics['compliant']), '✓'],
-        ['Items Needing Attention', str(metrics['warning']), '⚠'],
-        ['Critical Items', str(metrics['critical']), '✗' if metrics['critical'] > 0 else '✓'],
+        ['Total Items', str(metrics['total_items']), '-'],
+        ['Compliant', str(metrics['compliant']), '✓'],
+        ['Warning', str(metrics['warning']), '⚠'],
+        ['Critical', str(metrics['critical']), '✗' if metrics['critical'] > 0 else '✓'],
         ['Risk Score', f"{metrics['risk_score']}/100", 
          'Low' if metrics['risk_score'] < 30 else 'Medium' if metrics['risk_score'] < 60 else 'High'],
     ]
@@ -198,28 +185,20 @@ def generate_pdf_report(org_id, org_name, compliance_data, metrics, frameworks_s
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 12),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
         ('GRID', (0, 0), (-1, -1), 1, colors.grey),
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 10),
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F8F9FA')])
     ]))
     
     story.append(summary_table)
     story.append(Spacer(1, 0.3*inch))
     
-    # Framework Breakdown
-    story.append(Paragraph("Framework Compliance Breakdown", heading_style))
+    story.append(Paragraph("Framework Breakdown", heading_style))
     
     framework_data = [['Framework', 'Score', 'Total', 'Compliant', 'Warning', 'Critical']]
     for fw_id, fw in frameworks_summary.items():
         framework_data.append([
-            fw['name'],
-            f"{fw['score']}%",
-            str(fw['total']),
-            str(fw['compliant']),
-            str(fw['warning']),
-            str(fw['critical'])
+            fw['name'], f"{fw['score']}%", str(fw['total']),
+            str(fw['compliant']), str(fw['warning']), str(fw['critical'])
         ])
     
     framework_table = Table(framework_data, colWidths=[2.5*inch, 0.8*inch, 0.8*inch, 0.8*inch, 0.8*inch, 0.8*inch])
@@ -229,56 +208,11 @@ def generate_pdf_report(org_id, org_name, compliance_data, metrics, frameworks_s
         ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 11),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
         ('GRID', (0, 0), (-1, -1), 1, colors.grey),
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 10),
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F8F9FA')])
     ]))
     
     story.append(framework_table)
-    story.append(Spacer(1, 0.3*inch))
-    
-    # Critical Items
-    critical_items = [d for d in compliance_data if d['status'] == 'critical']
-    if critical_items:
-        story.append(Paragraph("Critical Items Requiring Immediate Action", heading_style))
-        
-        for item in critical_items[:5]:
-            story.append(Paragraph(
-                f"• <b>{item['compliance_items']['name']}</b> ({item['framework']['name']})",
-                styles['Normal']
-            ))
-            story.append(Paragraph(
-                f"  {item['notes'] if item.get('notes') else 'No notes'}",
-                styles['Normal']
-            ))
-            story.append(Spacer(1, 0.1*inch))
-    
-    # Recommendations
-    story.append(PageBreak())
-    story.append(Paragraph("Recommendations", heading_style))
-    
-    recommendations = []
-    if metrics['critical'] > 0:
-        recommendations.append(f"Address {metrics['critical']} critical compliance gaps immediately")
-    if metrics['warning'] > 3:
-        recommendations.append(f"Review and resolve {metrics['warning']} items flagged with warnings")
-    if metrics['compliance_score'] < 80:
-        recommendations.append("Implement regular compliance reviews to improve overall score")
-    recommendations.append("Schedule quarterly compliance audits")
-    recommendations.append("Ensure all team members complete required training")
-    
-    for rec in recommendations:
-        story.append(Paragraph(f"• {rec}", styles['Normal']))
-        story.append(Spacer(1, 0.1*inch))
-    
-    # Footer
-    story.append(Spacer(1, 0.5*inch))
-    story.append(Paragraph(
-        "This report was generated by CompliGH - Ghana Fintech Compliance Monitor",
-        ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, textColor=colors.grey, alignment=TA_CENTER)
-    ))
     
     doc.build(story)
     buffer.seek(0)
@@ -286,7 +220,7 @@ def generate_pdf_report(org_id, org_name, compliance_data, metrics, frameworks_s
 
 
 # =============================================================================
-# IMPROVED CSS - Professional & Smooth
+# IMPROVED CSS
 # =============================================================================
 
 st.markdown("""
@@ -296,18 +230,18 @@ st.markdown("""
     * { font-family: 'Inter', sans-serif; }
     
     .main { 
-        background: linear-gradient(135deg, #F8F9FA 0%, #FFFFFF 100%);
-        animation: fadeIn 0.5s ease-in;
+        background: linear-gradient(135deg, #FAFAFA 0%, #FFFFFF 100%);
+        animation: fadeIn 0.6s ease-in;
     }
     
     @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
     }
     
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%);
-        box-shadow: 4px 0 20px rgba(0,0,0,0.1);
+        box-shadow: 4px 0 24px rgba(0,0,0,0.12);
     }
     
     [data-testid="stSidebar"] * { color: #F1F5F9 !important; }
@@ -317,7 +251,6 @@ st.markdown("""
         font-size: 2.75rem;
         font-weight: 900;
         color: #0F172A;
-        text-shadow: 1px 1px 2px rgba(0,0,0,0.05);
     }
     
     [data-testid="stMetricLabel"] {
@@ -331,12 +264,12 @@ st.markdown("""
     .stButton>button {
         background: linear-gradient(135deg, #D97706 0%, #B45309 100%);
         color: white;
-        border-radius: 14px;
-        padding: 1rem 2.5rem;
+        border-radius: 12px;
+        padding: 0.875rem 2rem;
         border: none;
         font-weight: 700;
-        font-size: 1.0625rem;
-        box-shadow: 0 6px 20px rgba(217, 119, 6, 0.3);
+        font-size: 1rem;
+        box-shadow: 0 4px 16px rgba(217, 119, 6, 0.3);
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         text-transform: uppercase;
         letter-spacing: 0.05em;
@@ -344,148 +277,171 @@ st.markdown("""
     
     .stButton>button:hover {
         background: linear-gradient(135deg, #B45309 0%, #92400E 100%);
-        box-shadow: 0 10px 30px rgba(217, 119, 6, 0.5);
-        transform: translateY(-4px) scale(1.02);
-    }
-    
-    .stButton>button:active {
-        transform: translateY(-2px) scale(0.98);
+        box-shadow: 0 8px 24px rgba(217, 119, 6, 0.5);
+        transform: translateY(-3px);
     }
     
     h1 {
         color: #0F172A !important;
         font-weight: 900 !important;
-        font-size: 3.5rem !important;
-        letter-spacing: -0.03em !important;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.05);
+        font-size: 3rem !important;
+        letter-spacing: -0.02em !important;
     }
     
     h2 {
         color: #1E293B !important;
         font-weight: 800 !important;
-        font-size: 2rem !important;
-        border-bottom: 4px solid #D97706;
-        padding-bottom: 0.75rem;
-        margin-top: 2.5rem !important;
+        font-size: 1.875rem !important;
+        border-bottom: 3px solid #D97706;
+        padding-bottom: 0.5rem;
+        margin-top: 2rem !important;
     }
     
-    h3 { color: #334155 !important; font-weight: 700 !important; font-size: 1.5rem !important; }
+    h3 { color: #334155 !important; font-weight: 700 !important; }
     
     .stProgress > div > div > div {
-        background: linear-gradient(90deg, #D97706 0%, #FBBF24 50%, #10B981 100%);
-        border-radius: 12px;
-        box-shadow: 0 2px 8px rgba(217, 119, 6, 0.3);
+        background: linear-gradient(90deg, #EF4444 0%, #F59E0B 50%, #10B981 100%);
+        border-radius: 10px;
     }
     
     .stProgress > div > div {
-        background-color: #E2E8F0;
-        border-radius: 12px;
-        height: 14px;
+        background-color: #E5E7EB;
+        border-radius: 10px;
+        height: 10px;
     }
     
-    .status-card {
+    .framework-card {
         background: white;
         border-radius: 16px;
-        padding: 1.5rem;
+        padding: 2rem;
         box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        border: 2px solid transparent;
+        border: 2px solid #F1F5F9;
         transition: all 0.3s ease;
-        cursor: pointer;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
     }
     
-    .status-card:hover {
-        transform: translateY(-6px);
-        box-shadow: 0 12px 28px rgba(0,0,0,0.15);
+    .framework-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 12px 32px rgba(0,0,0,0.16);
         border-color: #D97706;
     }
     
-    .status-compliant { border-left: 6px solid #10B981; }
-    .status-warning { border-left: 6px solid #F59E0B; }
-    .status-critical { border-left: 6px solid #EF4444; }
+    .framework-card.compliant {
+        border-left: 6px solid #10B981;
+    }
+    
+    .framework-card.warning {
+        border-left: 6px solid #F59E0B;
+    }
+    
+    .framework-card.critical {
+        border-left: 6px solid #EF4444;
+    }
+    
+    .framework-header {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #1E293B;
+        margin-bottom: 1rem;
+    }
+    
+    .framework-score {
+        font-size: 3.5rem;
+        font-weight: 900;
+        color: #0F172A;
+        line-height: 1;
+        margin: 1rem 0;
+    }
+    
+    .framework-status {
+        font-size: 1rem;
+        font-weight: 700;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        display: inline-block;
+        margin-bottom: 1rem;
+    }
+    
+    .status-compliant {
+        background: #D1FAE5;
+        color: #065F46;
+    }
+    
+    .status-warning {
+        background: #FEF3C7;
+        color: #92400E;
+    }
+    
+    .status-critical {
+        background: #FEE2E2;
+        color: #991B1B;
+    }
+    
+    .framework-stats {
+        display: flex;
+        justify-content: space-between;
+        margin-top: auto;
+        padding-top: 1rem;
+        border-top: 2px solid #F1F5F9;
+    }
+    
+    .stat-item {
+        text-align: center;
+    }
+    
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: #1E293B;
+    }
+    
+    .stat-label {
+        font-size: 0.75rem;
+        color: #64748B;
+        text-transform: uppercase;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+    }
     
     .stSuccess {
         background: linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%);
         border-left: 6px solid #10B981;
         padding: 1.5rem 2rem;
-        border-radius: 14px;
+        border-radius: 12px;
         font-weight: 700;
-        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
     }
     
     .stWarning {
         background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
         border-left: 6px solid #F59E0B;
         padding: 1.5rem 2rem;
-        border-radius: 14px;
+        border-radius: 12px;
         font-weight: 700;
-        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
     }
     
     .stError {
         background: linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%);
         border-left: 6px solid #EF4444;
         padding: 1.5rem 2rem;
-        border-radius: 14px;
+        border-radius: 12px;
         font-weight: 700;
-        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
-    }
-    
-    .stInfo {
-        background: linear-gradient(135deg, #DBEAFE 0%, #BFDBFE 100%);
-        border-left: 6px solid #3B82F6;
-        padding: 1.5rem 2rem;
-        border-radius: 14px;
-        font-weight: 700;
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
-    }
-    
-    div[data-testid="column"] > div {
-        background: white;
-        padding: 2rem;
-        border-radius: 16px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-        border: 2px solid #F1F5F9;
-        transition: all 0.3s ease;
-    }
-    
-    div[data-testid="column"] > div:hover {
-        box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-        border-color: #CBD5E1;
-        transform: translateY(-3px);
     }
     
     hr {
-        margin: 3rem 0;
+        margin: 2.5rem 0;
         border: none;
-        height: 3px;
+        height: 2px;
         background: linear-gradient(90deg, transparent, #D97706, transparent);
     }
     
     .block-container { padding: 2rem 3rem; max-width: 1600px; }
     
+    p { color: #475569; font-size: 1rem; font-weight: 500; line-height: 1.7; }
+    
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    
-    p, .stMarkdown {
-        color: #475569;
-        font-size: 1.0625rem;
-        font-weight: 500;
-        line-height: 1.8;
-    }
-    
-    .stCaption {
-        color: #64748B;
-        font-size: 0.9375rem;
-        font-weight: 600;
-    }
-    
-    /* Smooth scrolling */
-    html { scroll-behavior: smooth; }
-    
-    /* Loading animation */
-    .stSpinner > div {
-        border-top-color: #D97706 !important;
-    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -519,7 +475,6 @@ try:
     
 except Exception as e:
     st.error(f"⚠️ Error loading data: {e}")
-    st.info("Make sure database is set up correctly")
     st.stop()
 
 # =============================================================================
@@ -553,9 +508,9 @@ with st.sidebar:
     st.markdown("### 🎯 Quick Stats")
     col1, col2 = st.columns(2)
     with col1:
-        st.metric("Frameworks", len(frameworks_summary), label_visibility="visible")
+        st.metric("Frameworks", len(frameworks_summary))
     with col2:
-        st.metric("Items", st.session_state.total_items, label_visibility="visible")
+        st.metric("Items", st.session_state.total_items)
     
     col1, col2 = st.columns(2)
     with col1:
@@ -573,13 +528,6 @@ with st.sidebar:
     if st.button("🔄 Refresh Data", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
-    
-    st.markdown("""
-        <div style='text-align: center; padding: 2rem 0 1rem 0; color: #94A3B8;'>
-            <small>Version 2.0.0</small><br>
-            <small>© 2026 CompliGH</small>
-        </div>
-    """, unsafe_allow_html=True)
 
 # =============================================================================
 # MAIN CONTENT
@@ -589,87 +537,44 @@ st.title("📊 Compliance Dashboard")
 st.markdown("##### Real-time monitoring for Ghana fintech regulations")
 st.markdown("")
 
-# Top metrics row
+# Top metrics
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    score = st.session_state.compliance_score
-    delta = "+5%" if score >= 85 else "-3%"
-    delta_color = "normal" if score >= 85 else "inverse"
-    
-    st.metric(
-        label="Compliance Score",
-        value=f"{score}%",
-        delta=delta,
-        delta_color=delta_color,
-        help="Percentage of compliant items"
-    )
+    st.metric("Compliance Score", f"{st.session_state.compliance_score}%", 
+              "+5%" if st.session_state.compliance_score >= 85 else "-3%")
 
 with col2:
-    total = st.session_state.total_items
     needs_attention = st.session_state.warning_items + st.session_state.critical_items
-    
-    st.metric(
-        label="Active Regulations",
-        value=str(total),
-        delta=f"{needs_attention} need action",
-        delta_color="inverse" if needs_attention > 0 else "normal",
-        help="Total compliance requirements tracked"
-    )
+    st.metric("Active Regulations", st.session_state.total_items, 
+              f"{needs_attention} need action" if needs_attention > 0 else "All good")
 
 with col3:
     risk = st.session_state.risk_score
-    
-    if risk < 20:
-        risk_level = "Very Low"
-        risk_color = "normal"
-        risk_delta = "↓ Excellent"
-    elif risk < 40:
-        risk_level = "Low"
-        risk_color = "normal"
-        risk_delta = "↓ Good"
-    elif risk < 60:
-        risk_level = "Medium"
-        risk_color = "off"
-        risk_delta = "→ Monitor"
-    else:
-        risk_level = "High"
-        risk_color = "inverse"
-        risk_delta = "↑ Act Now"
-    
-    st.metric(
-        label="Risk Level",
-        value=risk_level,
-        delta=risk_delta,
-        delta_color=risk_color,
-        help=f"Risk score: {risk}/100"
-    )
+    risk_level = "Very Low" if risk < 20 else "Low" if risk < 40 else "Medium" if risk < 60 else "High"
+    st.metric("Risk Level", risk_level, f"{risk}/100")
 
 with col4:
-    critical_count = st.session_state.critical_items
-    
-    st.metric(
-        label="Critical Items",
-        value=str(critical_count),
-        delta="Immediate action" if critical_count > 0 else "None",
-        delta_color="inverse" if critical_count > 0 else "normal",
-        help="Items requiring urgent attention"
-    )
+    st.metric("Critical Items", st.session_state.critical_items,
+              "Immediate action" if st.session_state.critical_items > 0 else "None")
 
 st.markdown("---")
 
-# Visual Framework Status Overview
+# =============================================================================
+# VISUAL FRAMEWORK STATUS OVERVIEW - FIXED!
+# =============================================================================
+
 st.markdown("## 🎯 Compliance Status Overview")
 st.markdown("##### Visual breakdown of all frameworks")
 st.markdown("")
 
 framework_display = {
-    'Bank of Ghana': {'emoji': '🏦', 'order': 1, 'color': '#3B82F6'},
-    'AML/CFT': {'emoji': '💰', 'order': 2, 'color': '#10B981'},
-    'Data Protection Act': {'emoji': '🔒', 'order': 3, 'color': '#8B5CF6'},
-    'Payment Systems Act': {'emoji': '💳', 'order': 4, 'color': '#EC4899'},
-    'ISO 27001': {'emoji': '🔐', 'order': 5, 'color': '#F59E0B'},
-    'PCI DSS': {'emoji': '💳', 'order': 6, 'color': '#EF4444'}
+    'Bank of Ghana': {'emoji': '🏦', 'order': 1},
+    'AML/CFT': {'emoji': '💰', 'order': 2},
+    'Data Protection Act': {'emoji': '🔒', 'order': 3},
+    'Payment Systems Act': {'emoji': '💳', 'order': 4},
+    'ISO 27001': {'emoji': '🔐', 'order': 5},
+    'PCI DSS': {'emoji': '💳', 'order': 6}
 }
 
 sorted_frameworks = sorted(
@@ -677,83 +582,72 @@ sorted_frameworks = sorted(
     key=lambda x: framework_display.get(x[1]['name'], {}).get('order', 99)
 )
 
-# Create 2 rows of 3 columns
-row1_frameworks = sorted_frameworks[:3]
-row2_frameworks = sorted_frameworks[3:]
-
-# First row
-cols = st.columns(3)
-for idx, (fw_id, stats) in enumerate(row1_frameworks):
-    with cols[idx]:
-        framework_name = stats['name']
-        emoji = framework_display.get(framework_name, {}).get('emoji', '📋')
-        score = stats['score']
-        
-        if score >= 80:
-            status = "✅ Compliant"
-            status_class = "status-compliant"
-        elif score >= 60:
-            status = "⚠️ Review"
-            status_class = "status-warning"
-        else:
-            status = "❌ Action Needed"
-            status_class = "status-critical"
-        
-        st.markdown(f"""
-            <div class="status-card {status_class}">
-                <h3 style="margin: 0; font-size: 1.25rem;">{emoji} {framework_name}</h3>
-                <div style="font-size: 3rem; font-weight: 900; color: #0F172A; margin: 1rem 0;">{score}%</div>
-                <div style="font-weight: 700; color: #64748B; margin-bottom: 1rem;">{status}</div>
-                <div style="display: flex; justify-content: space-between; font-size: 0.875rem; color: #64748B;">
-                    <span>✅ {stats['compliant']}</span>
-                    <span>⚠️ {stats['warning']}</span>
-                    <span>❌ {stats['critical']}</span>
+# Display frameworks in 2 rows of 3
+for row_num in range(2):
+    cols = st.columns(3)
+    
+    start_idx = row_num * 3
+    end_idx = start_idx + 3
+    row_frameworks = sorted_frameworks[start_idx:end_idx]
+    
+    for col_idx, (fw_id, stats) in enumerate(row_frameworks):
+        with cols[col_idx]:
+            framework_name = stats['name']
+            emoji = framework_display.get(framework_name, {}).get('emoji', '📋')
+            score = stats['score']
+            
+            # Determine status
+            if score >= 80:
+                status_text = "✅ Compliant"
+                status_class = "compliant"
+                status_style = "status-compliant"
+            elif score >= 60:
+                status_text = "⚠️ Review Needed"
+                status_class = "warning"
+                status_style = "status-warning"
+            else:
+                status_text = "❌ Action Required"
+                status_class = "critical"
+                status_style = "status-critical"
+            
+            # Render framework card
+            st.markdown(f"""
+                <div class="framework-card {status_class}">
+                    <div class="framework-header">
+                        {emoji} {framework_name}
+                    </div>
+                    <div class="framework-score">{score}%</div>
+                    <div class="framework-status {status_style}">
+                        {status_text}
+                    </div>
+                    <div class="framework-stats">
+                        <div class="stat-item">
+                            <div class="stat-value">{stats['compliant']}</div>
+                            <div class="stat-label">✅ Done</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">{stats['warning']}</div>
+                            <div class="stat-label">⚠️ Review</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">{stats['critical']}</div>
+                            <div class="stat-label">❌ Critical</div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        st.progress(score / 100)
-        
-        if st.button(f"View Details", key=f"view_{fw_id}", use_container_width=True):
-            st.switch_page("pages/1_📋_Compliance_Frameworks.py")
-
-st.markdown("")
-
-# Second row
-cols = st.columns(3)
-for idx, (fw_id, stats) in enumerate(row2_frameworks):
-    with cols[idx]:
-        framework_name = stats['name']
-        emoji = framework_display.get(framework_name, {}).get('emoji', '📋')
-        score = stats['score']
-        
-        if score >= 80:
-            status = "✅ Compliant"
-            status_class = "status-compliant"
-        elif score >= 60:
-            status = "⚠️ Review"
-            status_class = "status-warning"
-        else:
-            status = "❌ Action Needed"
-            status_class = "status-critical"
-        
-        st.markdown(f"""
-            <div class="status-card {status_class}">
-                <h3 style="margin: 0; font-size: 1.25rem;">{emoji} {framework_name}</h3>
-                <div style="font-size: 3rem; font-weight: 900; color: #0F172A; margin: 1rem 0;">{score}%</div>
-                <div style="font-weight: 700; color: #64748B; margin-bottom: 1rem;">{status}</div>
-                <div style="display: flex; justify-content: space-between; font-size: 0.875rem; color: #64748B;">
-                    <span>✅ {stats['compliant']}</span>
-                    <span>⚠️ {stats['warning']}</span>
-                    <span>❌ {stats['critical']}</span>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        st.progress(score / 100)
-        
-        if st.button(f"View Details", key=f"view_{fw_id}", use_container_width=True):
-            st.switch_page("pages/1_📋_Compliance_Frameworks.py")
+            """, unsafe_allow_html=True)
+            
+            st.markdown("")
+            
+            # Progress bar
+            st.progress(score / 100)
+            
+            # View details button
+            if st.button(f"📋 View Details", key=f"view_{fw_id}", use_container_width=True):
+                st.switch_page("pages/1_📋_Compliance_Frameworks.py")
+    
+    if row_num == 0:
+        st.markdown("<div style='margin: 2rem 0;'></div>", unsafe_allow_html=True)
 
 st.markdown("---")
 
@@ -762,11 +656,9 @@ st.markdown("## 📈 Compliance Trends")
 st.markdown("##### Track your progress over time")
 st.markdown("")
 
-# Generate 6 months of trend data (simulated improvement)
 dates = pd.date_range(end=datetime.now(), periods=6, freq='M')
 base_score = metrics['compliance_score']
 
-# Simulate gradual improvement
 if base_score >= 85:
     scores = [base_score - 8 + (i * 1.5) for i in range(6)]
 else:
@@ -776,30 +668,19 @@ scores[-1] = base_score
 fig = go.Figure()
 
 fig.add_trace(go.Scatter(
-    x=dates,
-    y=scores,
-    mode='lines+markers',
-    name='Compliance Score',
+    x=dates, y=scores, mode='lines+markers', name='Compliance Score',
     line=dict(color='#D97706', width=4),
-    marker=dict(size=14, color='#FBBF24', line=dict(color='#D97706', width=3)),
-    fill='tozeroy',
-    fillcolor='rgba(217, 119, 6, 0.1)'
+    marker=dict(size=12, color='#FBBF24', line=dict(color='#D97706', width=2)),
+    fill='tozeroy', fillcolor='rgba(217, 119, 6, 0.1)'
 ))
 
 fig.add_hline(y=80, line_dash="dash", line_color="#10B981", 
-              annotation_text="Target: 80%", annotation_position="right")
+              annotation_text="Target: 80%")
 
 fig.update_layout(
-    title="6-Month Compliance Score Trend",
-    xaxis_title="Month",
-    yaxis_title="Compliance Score (%)",
-    height=400,
-    hovermode='x unified',
-    plot_bgcolor='white',
-    paper_bgcolor='white',
-    font=dict(family='Inter', size=12),
-    yaxis=dict(range=[0, 100], gridcolor='#F1F5F9'),
-    xaxis=dict(gridcolor='#F1F5F9')
+    xaxis_title="Month", yaxis_title="Compliance Score (%)", height=350,
+    hovermode='x unified', plot_bgcolor='white', paper_bgcolor='white',
+    yaxis=dict(range=[0, 100])
 )
 
 st.plotly_chart(fig, use_container_width=True)
@@ -808,104 +689,83 @@ st.markdown("---")
 
 # Recent Activity
 st.markdown("## 📜 Recent Activity")
-st.markdown("##### Latest compliance actions")
 st.markdown("")
 
 try:
-    recent_logs = get_recent_audit_logs(org_id, limit=8)
+    recent_logs = get_recent_audit_logs(org_id, limit=6)
     
     if recent_logs:
-        for i, log in enumerate(recent_logs):
-            col1, col2, col3, col4 = st.columns([2, 5, 2, 1])
-            
+        for log in recent_logs:
             created_at = datetime.fromisoformat(log['created_at'].replace('Z', '+00:00'))
             time_ago = datetime.now() - created_at.replace(tzinfo=None)
             
             if time_ago.days > 0:
                 time_str = f"{time_ago.days}d ago"
             elif time_ago.seconds >= 3600:
-                hours = time_ago.seconds // 3600
-                time_str = f"{hours}h ago"
+                time_str = f"{time_ago.seconds // 3600}h ago"
             else:
-                minutes = max(1, time_ago.seconds // 60)
-                time_str = f"{minutes}m ago"
+                time_str = f"{max(1, time_ago.seconds // 60)}m ago"
             
-            with col1:
-                st.markdown(f"<div style='color: #94A3B8; font-weight: 600;'>{time_str}</div>", unsafe_allow_html=True)
+            user_name = log.get('users', {}).get('full_name', 'System') if log.get('users') else 'System'
             
-            with col2:
-                icon_map = {
-                    "update": "🔄", "upload": "📤", "complete": "✅", 
-                    "generate": "📊", "create": "➕", "delete": "🗑️",
-                    "send_alert": "📧", "view": "👁️"
-                }
-                icon = icon_map.get(log['action'], "📝")
-                st.markdown(f"<div style='color: #1E293B; font-weight: 600; font-size: 1.0625rem;'>{icon} {log['description']}</div>", unsafe_allow_html=True)
+            icon_map = {
+                "update": "🔄", "upload": "📤", "complete": "✅", 
+                "generate": "📊", "send_alert": "📧"
+            }
+            icon = icon_map.get(log['action'], "📝")
             
-            with col3:
-                user_name = log.get('users', {}).get('full_name', 'System') if log.get('users') else 'System'
-                st.markdown(f"<div style='color: #64748B; text-align: right;'>{user_name}</div>", unsafe_allow_html=True)
-            
-            with col4:
-                action_colors = {
-                    "update": "#3B82F6", "upload": "#10B981", "complete": "#10B981",
-                    "generate": "#8B5CF6", "create": "#F59E0B", "send_alert": "#EC4899"
-                }
-                color = action_colors.get(log['action'], "#94A3B8")
-                st.markdown(f"<div style='width: 8px; height: 8px; background: {color}; border-radius: 50%; margin-top: 8px;'></div>", unsafe_allow_html=True)
-            
-            if i < len(recent_logs) - 1:
-                st.markdown("<hr style='margin: 1rem 0; opacity: 0.3;'>", unsafe_allow_html=True)
+            st.markdown(f"""
+                <div style="padding: 0.75rem; background: white; border-radius: 8px; margin-bottom: 0.5rem; border-left: 4px solid #D97706;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <div style="font-weight: 600; color: #1E293B;">{icon} {log['description']}</div>
+                        <div style="color: #94A3B8; font-size: 0.875rem;">{time_str}</div>
+                    </div>
+                    <div style="color: #64748B; font-size: 0.875rem; margin-top: 0.25rem;">by {user_name}</div>
+                </div>
+            """, unsafe_allow_html=True)
     else:
         st.info("No recent activity")
-        
-except Exception as e:
+except:
     st.warning("Unable to load activity")
 
 st.markdown("---")
 
-# Quick Actions - Actually Working!
+# Quick Actions
 st.markdown("## 🚀 Quick Actions")
-st.markdown("##### Take action on your compliance")
 st.markdown("")
 
-col1, col2, col3 = st.columns(3, gap="large")
+col1, col2, col3 = st.columns(3)
 
 with col1:
     if st.button("📥 GENERATE REPORT", use_container_width=True, type="primary"):
-        with st.spinner("🔄 Generating comprehensive compliance report..."):
+        with st.spinner("Generating report..."):
             try:
                 pdf_buffer = generate_pdf_report(
-                    org_id, 
-                    st.session_state.organization_name,
-                    compliance_data,
-                    metrics,
-                    frameworks_summary
+                    org_id, st.session_state.organization_name,
+                    compliance_data, metrics, frameworks_summary
                 )
                 
-                st.success("✅ Report generated successfully!")
+                st.success("✅ Report generated!")
                 
                 st.download_button(
-                    label="📥 Download PDF Report",
+                    label="📥 Download PDF",
                     data=pdf_buffer,
-                    file_name=f"CompliGH_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                    file_name=f"CompliGH_{datetime.now().strftime('%Y%m%d')}.pdf",
                     mime="application/pdf",
                     use_container_width=True
                 )
-                
             except Exception as e:
-                st.error(f"Error generating report: {e}")
-        
+                st.error(f"Error: {e}")
+
 with col2:
     if st.button("📧 SEND ALERTS", use_container_width=True, type="primary"):
-        with st.spinner("📧 Sending alerts to compliance team..."):
+        with st.spinner("Sending alerts..."):
             try:
-                recipient_count = send_email_alerts(org_id, "deadline")
-                st.success(f"✅ Deadline alerts sent to {recipient_count} team members!")
+                count = send_email_alerts(org_id)
+                st.success(f"✅ Alerts sent to {count} members!")
                 st.cache_data.clear()
-                
             except Exception as e:
-                st.error(f"Error sending alerts: {e}")
+                st.error(f"Error: {e}")
 
 with col3:
     if st.button("⚙️ SETTINGS", use_container_width=True, type="primary"):
@@ -913,42 +773,30 @@ with col3:
 
 st.markdown("---")
 
-# Critical Items Alert
+# Critical items alert
 if st.session_state.critical_items > 0:
     st.error(f"### 🚨 {st.session_state.critical_items} Critical Items Need Immediate Attention!")
     
     critical_items = [d for d in compliance_data if d['status'] == 'critical']
     
     for item in critical_items[:3]:
-        with st.expander(f"❌ {item['compliance_items']['name']} ({item['framework']['name']})"):
+        with st.expander(f"❌ {item['compliance_items']['name']}"):
+            st.markdown(f"**Framework:** {item['framework']['name']}")
             st.markdown(f"**Description:** {item['compliance_items']['description']}")
-            st.markdown(f"**Current Status:** {item.get('notes', 'No notes available')}")
+            st.markdown(f"**Notes:** {item.get('notes', 'No notes')}")
             st.markdown(f"**Progress:** {item['progress']}%")
             
-            if st.button(f"Fix This Now", key=f"fix_{item['compliance_item_id']}"):
+            if st.button(f"Fix Now", key=f"fix_{item['compliance_item_id']}"):
                 st.switch_page("pages/1_📋_Compliance_Frameworks.py")
 
-st.markdown("---")
-
 # Footer
+st.markdown("---")
 st.markdown("""
-    <div style='text-align: center; padding: 3rem 0 2rem 0;'>
-        <div style='font-size: 1.5rem; font-weight: 800; color: #0F172A; margin-bottom: 0.5rem;'>
-            CompliGH
-        </div>
-        <div style='color: #64748B; font-size: 0.9375rem; font-weight: 600;'>
-            Ghana Fintech Compliance Monitor
-        </div>
+    <div style='text-align: center; padding: 2rem 0;'>
+        <div style='font-size: 1.5rem; font-weight: 800; color: #0F172A;'>CompliGH</div>
+        <div style='color: #64748B; margin-top: 0.5rem;'>Ghana Fintech Compliance Monitor</div>
         <div style='color: #94A3B8; font-size: 0.875rem; margin-top: 1rem;'>
             Powered by Streamlit • Built with ❤️ for Ghana's fintech ecosystem
-        </div>
-        <div style='margin-top: 1.5rem;'>
-            <span style='display: inline-block; margin: 0 0.5rem; color: #CBD5E1;'>•</span>
-            <a href="#" style='color: #64748B; text-decoration: none; font-size: 0.875rem;'>Privacy</a>
-            <span style='display: inline-block; margin: 0 0.5rem; color: #CBD5E1;'>•</span>
-            <a href="#" style='color: #64748B; text-decoration: none; font-size: 0.875rem;'>Terms</a>
-            <span style='display: inline-block; margin: 0 0.5rem; color: #CBD5E1;'>•</span>
-            <a href="#" style='color: #64748B; text-decoration: none; font-size: 0.875rem;'>Support</a>
         </div>
     </div>
 """, unsafe_allow_html=True)
