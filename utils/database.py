@@ -104,3 +104,12 @@ def check_rls_policies():
         return results
     except:
         return {}
+import streamlit as st
+from supabase import create_client
+
+@st.cache_resource
+def get_supabase_client():
+    """Get Supabase client"""
+    url = st.secrets["supabase"]["url"]
+    key = st.secrets["supabase"]["key"]
+    return create_client(url, key)
