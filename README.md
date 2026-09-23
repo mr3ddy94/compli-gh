@@ -26,7 +26,7 @@ CompliGH helps Ghanaian fintech companies monitor and manage compliance across m
 
 ##  Live Demo
 
-Visit the live app: [https://yourapp.streamlit.app](https://yourapp.streamlit.app)
+Visit the live app: (https://compligh.streamlit.app/)
 
 ##  Tech Stack
 
